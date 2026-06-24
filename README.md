@@ -78,8 +78,8 @@ A fast, standalone desktop GUI built using CustomTkinter.
 Ensure you are using Python 3.10+ and run the following commands to install dependencies:
 
 ```bash
-git clone https://github.com/atifehab/Computer-vision-project-.git
-cd "Computer-vision-project-"
+git clone https://github.com/atifehab/COTS-Detection.git
+cd "COTS-Detection"
 pip install -r requirements.txt
 ```
 
