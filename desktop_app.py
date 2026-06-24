@@ -77,15 +77,27 @@ def load_model():
 
     base_dir = os.path.dirname(os.path.abspath(__file__))
     zip_path = os.path.join(base_dir, "cots_model_archive.zip")
+    new_model_path = os.path.join(base_dir, "models", "cots_model.pth")
 
-    if not os.path.exists(zip_path):
-        shutil.make_archive(
-            zip_path.replace(".zip", ""), "zip",
-            base_dir, "cots_model"
+    if os.path.exists(new_model_path):
+        state_dict = torch.load(new_model_path, map_location="cpu", weights_only=False)
+    else:
+        if not os.path.exists(zip_path):
+            shutil.make_archive(
+                zip_path.replace(".zip", ""), "zip",
+                base_dir, "cots_model"
+            )
+        state_dict = torch.load(zip_path, map_location="cpu", weights_only=False)
+
+    try:
+        model.load_state_dict(state_dict)
+    except RuntimeError:
+        model.classifier = nn.Sequential(
+            nn.Dropout(p=0.3),
+            nn.Linear(num_features, 2),
         )
+        model.load_state_dict(state_dict)
 
-    state_dict = torch.load(zip_path, map_location="cpu", weights_only=False)
-    model.load_state_dict(state_dict)
     model.eval()
     return model
 

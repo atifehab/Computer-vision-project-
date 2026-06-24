@@ -1,128 +1,91 @@
-# COTS Detector — Crown-of-Thorns Starfish Classification
+# COTS Detector — Crown-of-Thorns Starfish Classification & Diagnosis
 
-A deep learning project for binary classification of Crown-of-Thorns Starfish (COTS) in underwater images, using a fine-tuned **EfficientNet-B0** model deployed via **Streamlit**.
+An advanced deep learning project designed to detect and diagnose Crown-of-Thorns Starfish (COTS) in marine environments. This project features a robust **EfficientNet-B0** training pipeline optimized for underwater imagery, a **Grad-CAM interpretability module** for diagnostic visualization, and two deployment options (**Streamlit web app** and **CustomTkinter desktop app**) featuring a premium dark theme.
 
-The Crown-of-Thorns Starfish (*Acanthaster planci*) is one of the most destructive predators of coral reefs. Early and accurate detection is critical for marine conservation efforts. This project provides both the training pipeline and a web-based inference tool for real-time COTS classification.
+The Crown-of-Thorns Starfish (*Acanthaster planci*) is a major marine predator responsible for extensive coral reef destruction. Accurate classification under varying lighting, turbidity, and color absorption conditions is critical for robotic ROV deployment and conservation efforts.
 
 ---
 
-## Project Structure
+## 📂 Project Structure
 
-```
+```text
 NTI project/
-├── app.py                          # Streamlit deployment app (web UI)
-├── requirements.txt                # Python dependencies
-├── src/
-│   └── EfficientNet_train.py       # Model training script
-└── cots_model/                     # Saved model weights (state_dict)
-    ├── data.pkl
-    ├── data/
-    └── ...
+├── app.py                          # Streamlit Deployment App (Web UI)
+├── desktop_app.py                  # CustomTkinter Deployment App (Desktop GUI)
+├── requirements.txt                # Python environment dependencies
+├── README.md                       # Project documentation
+├── models/
+│   └── cots_model.pth              # Saved model weights (after retraining)
+├── cots_model_archive.zip          # Packaged model weights (default/fallback)
+└── src/
+    ├── EfficientNet_train.py       # Advanced model training script (v2)
+    └── gradcam_analysis.py         # Grad-CAM interpretability diagnostic tool
 ```
 
 ---
 
-## Model Architecture
+## 🛠️ EfficientNet_train.py (Training Pipeline)
 
-| Component         | Detail                                      |
-|-------------------|---------------------------------------------|
-| **Backbone**      | EfficientNet-B0 (pretrained on ImageNet)    |
-| **Classifier**    | Linear(1280, 2)                             |
-| **Classes**       | Class 0: COTS / Class 1: Not COTS          |
-| **Input Size**    | 224 x 224 RGB                               |
-| **Optimizer**     | Adam (lr=0.001)                             |
-| **Loss Function** | CrossEntropyLoss                            |
-| **Epochs**        | 20                                          |
-| **Data Split**    | 70% Train / 15% Validation / 15% Test      |
+The original training script suffered from overfitting due to standard training transforms and tight bounding-box crops. The updated training script (`src/EfficientNet_train.py`) implements state-of-the-art techniques for marine datasets:
 
----
+### 1. Advanced Augmentation Pipeline
+*   **Aspect Ratio Distortion Fix**: Replaced generic resizing with `RandomResizedCrop` to ensure scale and ratio invariance.
+*   **Underwater Color Shift Simulation**: Randomly absorbs red light channels (which drop off first underwater) and preserves blue/green spectra to simulate varied depths.
+*   **Underwater Haze**: Simulates water particulate scattering and backscatter (turbidity).
+*   **Spatial Augmentations**: Uses Perspective transforms, Affine shifts, Blur, and Random Erasing to replicate camera angle changes and reef occlusions.
 
-## Dataset
-
-**Binary Cropped Crown-of-Thorns Dataset** from Kaggle:
-
-[https://www.kaggle.com/datasets/alexteboul/binary-cropped-crown-of-thorns-dataset](https://www.kaggle.com/datasets/alexteboul/binary-cropped-crown-of-thorns-dataset)
-
-The dataset contains cropped underwater images organized into two folders:
-- `cots_crops/` — Images containing COTS
-- `notcots_crops/` — Images without COTS
+### 2. Loss & Optimization Strategies
+*   **Focal Loss**: Employs `FocalLoss` instead of CrossEntropy to prioritize hard-to-classify, low-contrast, or dark purple starfish samples (hard negative mining).
+*   **Differential Learning Rates**: Backbone parameters use a lower learning rate (`1e-4`) to preserve pretrained weights, while the custom classifier head uses a higher rate (`1e-3`).
+*   **Learning Rate Warmup & Cosine Annealing**: Implements linear learning rate warmup followed by cosine annealing to ensure smooth, stable convergence.
+*   **Early Stopping**: Automatically stops training when validation accuracy halts improvement for a consecutive number of epochs.
 
 ---
 
-## Training
+## 🔍 gradcam_analysis.py (Diagnostic Tool)
 
-The training script (`src/EfficientNet_train.py`) performs the following steps:
-
-1. **Downloads** the dataset from Kaggle using the `opendatasets` library
-2. **Splits** the data into train (70%), validation (15%), and test (15%) sets
-3. **Applies** data augmentation (random horizontal flip, random rotation) on the training set
-4. **Fine-tunes** EfficientNet-B0 with ImageNet pretrained weights for 20 epochs
-5. **Evaluates** on the test set and prints accuracy, precision, recall, F1-score, and confusion matrix
-6. **Saves** the best model weights (by validation accuracy) to disk
-
-### Preprocessing
-
-All images are resized to 224x224 and normalized with ImageNet statistics:
-- Mean: [0.485, 0.456, 0.406]
-- Std: [0.229, 0.224, 0.225]
+**Grad-CAM (Gradient-weighted Class Activation Mapping)** is used to debug and verify the model's decision-making process. By calculating the gradients of the target class with respect to the feature maps of the final convolutional layer of the EfficientNet-B0 backbone:
+*   It generates a colored activation heatmap showing where the model is looking.
+*   **Why this is crucial**: Prevents the model from cheating on background features (such as bright sand or coral branches) and confirms that it is attending to the actual spiny morphology of the starfish.
+*   **Usage**: Runs diagnostic inference on images and outputs a visual side-by-side comparison of the raw image and the Grad-CAM heatmap.
 
 ---
 
-## Deployment
+## 🚀 Deployment Applications
 
-The Streamlit app (`app.py`) provides a web interface for real-time inference:
+We provide two deployment frontends, both optimized with a modern, glassmorphic dark theme:
 
-### Features
-- Upload images (JPG, JPEG, PNG) via drag-and-drop
-- Capture images directly from webcam
-- View prediction result with confidence score
-- See probability breakdown for both classes
+### 1. Streamlit Web App (`app.py`)
+Provides an interactive web interface.
+*   **Features**: Drag-and-drop file upload, live webcam stream integration, real-time confidence bar animation, and class probability breakdown.
+*   **Launch Command**:
+    ```bash
+    streamlit run app.py --server.port 8501
+    ```
 
-### Run the App
+### 2. CustomTkinter Desktop App (`desktop_app.py`)
+A fast, standalone desktop GUI built using CustomTkinter.
+*   **Features**: Native Windows dark-themed window, smooth result card transitions, and threaded background inference to keep the interface highly responsive.
+*   **Launch Command**:
+    ```bash
+    python desktop_app.py
+    ```
+
+---
+
+## ⚙️ Installation & Requirements
+
+Ensure you are using Python 3.10+ and run the following commands to install dependencies:
 
 ```bash
-pip install -r requirements.txt
-streamlit run app.py
-```
-
-The app will open at `http://localhost:8501`.
-
-### How It Works
-
-1. The saved EfficientNet-B0 state_dict is loaded and cached in memory
-2. Uploaded images are preprocessed (resize, crop, normalize)
-3. The model runs a forward pass and applies softmax to get class probabilities
-4. Results are displayed with a confidence bar and class breakdown
-
----
-
-## Installation
-
-```bash
-git clone https://github.com/<your-username>/Computer-vision-project.git
-cd Computer-vision-project
+git clone https://github.com/atifehab/Computer-vision-project-.git
+cd "Computer-vision-project-"
 pip install -r requirements.txt
 ```
 
----
-
-## Requirements
-
-- Python 3.10+
-- PyTorch 2.0+
-- torchvision 0.15+
-- Streamlit 1.28+
-- Pillow 9.0+
-- scikit-learn 1.0+
-
-See `requirements.txt` for the full list.
-
----
-
-## Technologies Used
-
-- **PyTorch** — Model architecture, training, and inference
-- **torchvision** — EfficientNet-B0 backbone and image transforms
-- **Streamlit** — Web application framework for deployment
-- **scikit-learn** — Evaluation metrics (accuracy, precision, recall, F1)
-- **opendatasets** — Kaggle dataset download automation
+### Key Libraries:
+*   `torch` & `torchvision` (PyTorch deep learning library framework)
+*   `streamlit` (Web app UI)
+*   `customtkinter` (Desktop GUI styling)
+*   `scikit-learn` (Accuracy, recall, and evaluation metrics)
+*   `opendatasets` (Automatic Kaggle dataset download wrapper)

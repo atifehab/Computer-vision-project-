@@ -334,16 +334,28 @@ def load_model():
     model.classifier[1] = nn.Linear(num_features, 2)
 
     # Determine paths
-    model_dir = os.path.join(os.path.dirname(__file__), "cots_model")
     zip_path = os.path.join(os.path.dirname(__file__), "cots_model_archive.zip")
-
-    # Re-create zip archive from the extracted model directory if needed
-    if not os.path.exists(zip_path):
-        shutil.make_archive(zip_path.replace(".zip", ""), "zip", ".", "cots_model")
+    new_model_path = os.path.join(os.path.dirname(__file__), "models", "cots_model.pth")
 
     # Load saved state_dict (OrderedDict of parameter tensors)
-    state_dict = torch.load(zip_path, map_location="cpu", weights_only=False)
-    model.load_state_dict(state_dict)
+    if os.path.exists(new_model_path):
+        state_dict = torch.load(new_model_path, map_location="cpu", weights_only=False)
+    else:
+        # Re-create zip archive from the extracted model directory if needed
+        if not os.path.exists(zip_path):
+            shutil.make_archive(zip_path.replace(".zip", ""), "zip", ".", "cots_model")
+        state_dict = torch.load(zip_path, map_location="cpu", weights_only=False)
+    
+    # Handle state_dict key matching for modified classifier structures
+    try:
+        model.load_state_dict(state_dict)
+    except RuntimeError:
+        # Try loading with the new Sequential head architecture (used in v2 training)
+        model.classifier = nn.Sequential(
+            nn.Dropout(p=0.3),
+            nn.Linear(num_features, 2),
+        )
+        model.load_state_dict(state_dict)
 
     # Set to evaluation mode: disables dropout, uses running mean/var for BN
     model.eval()
